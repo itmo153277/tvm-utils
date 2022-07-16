@@ -14,7 +14,7 @@ from pathlib import Path
 import tvm
 from tvm import relay, autotvm
 from tvm.autotvm.tuner import XGBTuner, GATuner, RandomTuner, GridSearchTuner
-from tvm_common import load_onnx_model
+from tvm_common import load_onnx_model, is_flop_limit_supported
 
 
 LOG = logging.getLogger(__file__)
@@ -90,12 +90,13 @@ def parse_args() -> argparse.Namespace:
         default=None,
         type=int,
     )
-    parser.add_argument(
-        "--max-tflops",
-        help="TFLOPS limit",
-        default=None,
-        type=int,
-    )
+    if is_flop_limit_supported():
+        parser.add_argument(
+            "--max-tflops",
+            help="TFLOPS limit",
+            default=None,
+            type=int,
+        )
     parser.add_argument(
         "--measure-num",
         help="Number of measurements",
@@ -211,13 +212,13 @@ def main(
     task_idx: Union[List[int], None],
     num_iter: Union[int, None],
     early_stopping: Union[int, None],
-    max_tflops: Union[float, None],
     measure_num: int,
     measure_repeats: int,
     measure_min_time: int,
     timeout_builder: int,
     timeout_runner: int,
     flush_cpu: bool,
+    max_tflops: Union[float, None] = None,
 ) -> int:
     """Run CLI."""
     target = tvm.target.Target(target, host=host)
@@ -244,6 +245,9 @@ def main(
         ))
     else:
         LOG.info("Will tune all kernels")
+    runner_opt = {}
+    if max_tflops is not None:
+        runner_opt.update({"max_flop_limit": max_tflops * 1e12})
     tuning_options = {
         "log_filename": tuner_log,
         "tuner": tuner_kind,
@@ -257,11 +261,7 @@ def main(
                 timeout=timeout_runner,
                 min_repeat_ms=measure_min_time,
                 enable_cpu_cache_flush=flush_cpu,
-                max_flop_limit=(
-                    max_tflops * 1e12
-                    if max_tflops is not None
-                    else None
-                ),
+                **runner_opt,
             ),
         ),
     }

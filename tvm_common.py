@@ -2,11 +2,12 @@
 
 """Common functions for TVM."""
 
+from typing import Dict, List, Tuple
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Tuple
+import inspect
 import tvm
-from tvm import relay
+from tvm import relay, autotvm
 import onnx
 
 
@@ -26,6 +27,12 @@ def list_tvm_targets() -> List[str]:
         for x in tvm.target.Target.list_kinds()
         if check_tvm_device_exists(x)
     ]
+
+
+def is_flop_limit_supported() -> bool:
+    """Check whether flop limit is supported."""
+    sig = inspect.signature(autotvm.LocalBuilder.__init__)
+    return "max_flop_limit" in sig.parameters
 
 
 def load_onnx_model(model_path: Path) -> \
