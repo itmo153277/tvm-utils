@@ -2,10 +2,11 @@
 
 """Common functions for TVM."""
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 from functools import lru_cache
-from pathlib import Path
 import inspect
+import platform
+from pathlib import Path
 import tvm
 from tvm import relay, autotvm
 import onnx
@@ -45,3 +46,16 @@ def load_onnx_model(model_path: Path) -> \
     }
     mod, params = relay.frontend.from_onnx(model, shape_dict)
     return mod, params
+
+
+def get_device_name(device_type: str, device_idx: int = 0) -> Union[str, None]:
+    """Get device name."""
+    try:
+        device = tvm.device(device_type, device_idx)
+        if not device.exist:
+            return None
+        if device_type.split()[0] == "llvm":
+            return platform.processor()
+        return device.device_name or ""
+    except ValueError:
+        return None

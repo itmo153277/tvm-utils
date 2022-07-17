@@ -58,6 +58,13 @@ def parse_args() -> argparse.Namespace:
         type=str,
     )
     parser.add_argument(
+        "-O", "--opt",
+        help="Optimization level (default: %(default)s)",
+        default=3,
+        type=int,
+        choices=[0, 1, 2, 3]
+    )
+    parser.add_argument(
         "-k", "--kind",
         dest="tuner_kind",
         help="Tuner type (default: %(default)s)",
@@ -140,19 +147,20 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def extract_tasks(model_path: Path, target: tvm.target.Target,
+def extract_tasks(model_path: Path, target: tvm.target.Target, opt: int,
                   op_list: List[str]) -> List[autotvm.task.Task]:
     """Extract tasks from model."""
     mod, params = load_onnx_model(model_path)
-    return autotvm.task.extract_from_program(
-        mod["main"],
-        target=target,
-        params=params,
-        ops=[
-            relay.op.get(op)
-            for op in op_list
-        ]
-    )
+    with tvm.transform.PassContext(opt_level=opt):
+        return autotvm.task.extract_from_program(
+            mod["main"],
+            target=target,
+            params=params,
+            ops=[
+                relay.op.get(op)
+                for op in op_list
+            ]
+        )
 
 
 def tune_kernels(
@@ -201,6 +209,7 @@ def main(
     model_path: Path,
     tuner_log: Path,
     target: str,
+    opt: int,
     tuner_kind: TunerKind,
     task_idx: Union[List[int], None],
     num_iter: Union[int, None],
@@ -219,6 +228,7 @@ def main(
     tasks = extract_tasks(
         model_path=model_path,
         target=target,
+        opt=opt,
         op_list=[
             "nn.conv2d_transpose",
             "nn.conv2d",
