@@ -135,6 +135,13 @@ def parse_args() -> argparse.Namespace:
         type=int,
     )
     parser.add_argument(
+        "--enable-transfer-learning",
+        help="Enable transfer learning",
+        dest="transfer_learning",
+        default=False,
+        action="store_true",
+    )
+    parser.add_argument(
         "model_path",
         help="Path to model file (ONNX)",
         type=Path,
@@ -169,7 +176,8 @@ def tune_kernels(
     log_filename: Path,
     tuner: TunerKind = TunerKind.GRID_SEARCH,
     early_stopping: Union[int, None] = None,
-    n_trial: Union[int, None] = None
+    n_trial: Union[int, None] = None,
+    transfer_learning: bool = False,
 ) -> None:
     """Tune TVM kernels."""
     for i, task in enumerate(tasks):
@@ -187,6 +195,10 @@ def tune_kernels(
         size = len(task.config_space)
         if n_trial is not None:
             size = min(size, n_trial)
+        if transfer_learning and log_filename.is_file():
+            tuner_obj.load_history(
+                autotvm.record.load_from_file(str(log_filename))
+            )
         tuner_obj.tune(
             n_trial=size,
             early_stopping=early_stopping,
@@ -220,6 +232,7 @@ def main(
     timeout_builder: int,
     timeout_runner: int,
     flush_cpu: bool,
+    transfer_learning: bool,
     max_tflops: Union[float, None] = None,
 ) -> int:
     """Run CLI."""
@@ -267,6 +280,7 @@ def main(
                 **runner_opt,
             ),
         ),
+        "transfer_learning": transfer_learning,
     }
     tune_kernels(tasks, **tuning_options)
     return 0
