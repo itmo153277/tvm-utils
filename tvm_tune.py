@@ -58,12 +58,6 @@ def parse_args() -> argparse.Namespace:
         type=str,
     )
     parser.add_argument(
-        "--host",
-        help="TVM host",
-        default=None,
-        type=str,
-    )
-    parser.add_argument(
         "-k", "--kind",
         dest="tuner_kind",
         help="Tuner type (default: %(default)s)",
@@ -207,7 +201,6 @@ def main(
     model_path: Path,
     tuner_log: Path,
     target: str,
-    host: Union[str, None],
     tuner_kind: TunerKind,
     task_idx: Union[List[int], None],
     num_iter: Union[int, None],
@@ -221,7 +214,7 @@ def main(
     max_tflops: Union[float, None] = None,
 ) -> int:
     """Run CLI."""
-    target = tvm.target.Target(target, host=host)
+    target = tvm.target.Target(target)
     LOG.info("Extracting tasks for target %s...", str(target))
     tasks = extract_tasks(
         model_path=model_path,
@@ -240,11 +233,11 @@ def main(
             for i, x in enumerate(tasks)
             if i in task_idx
         ]
-        LOG.info("WIll tune %d kernels (idx: %s)", len(tasks), ", ".join(
+        LOG.info("Will tune %d kernels (idx: %s)", len(tasks), ", ".join(
             [str(x) for x in task_idx]
         ))
     else:
-        LOG.info("Will tune all kernels")
+        LOG.info("Will tune all %d kernels", len(tasks))
     runner_opt = {}
     if max_tflops is not None:
         runner_opt.update({"max_flop_limit": max_tflops * 1e12})
