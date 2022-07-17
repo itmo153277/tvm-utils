@@ -32,7 +32,7 @@ def list_tvm_targets() -> List[str]:
 
 def is_flop_limit_supported() -> bool:
     """Check whether flop limit is supported."""
-    sig = inspect.signature(autotvm.LocalBuilder.__init__)
+    sig = inspect.signature(autotvm.LocalRunner.__init__)
     return "max_flop_limit" in sig.parameters
 
 
