@@ -99,7 +99,7 @@ def parse_args() -> argparse.Namespace:
         type=int,
     )
     parser.add_argument(
-        "--sa-size-size",
+        "--sa-pool-size",
         help="Optimzier pool size for xgb plan",
         default=128,
         type=int,

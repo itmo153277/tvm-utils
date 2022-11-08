@@ -3,6 +3,20 @@ Utilities for Apache TVM
 
 ## Model tuning
 
+### CPU
+
+```sh
+python -u tvm_tune.py \
+  -t llvm \
+  -O3 \
+  -k grid_search \
+  --measure-num 1 \
+  --measure-repeats 10 \
+  --flush-cpu
+  model.onnx \
+  tune.log
+```
+
 ### GPU
 
 ```sh
