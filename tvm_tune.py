@@ -14,6 +14,7 @@ from pathlib import Path
 import tvm
 from tvm import relay, autotvm
 from tvm.autotvm.tuner import XGBTuner, GATuner, RandomTuner, GridSearchTuner
+from tvm.autotvm.tuner.sa_model_optimizer import SimulatedAnnealingOptimizer
 from tvm_common import load_onnx_model, is_flop_limit_supported
 
 
@@ -90,6 +91,30 @@ def parse_args() -> argparse.Namespace:
         help="Early stopping",
         default=None,
         type=int,
+    )
+    parser.add_argument(
+        "--sa-num-iter",
+        help="Number of iterations for xgb plan optimizer",
+        default=500,
+        type=int,
+    )
+    parser.add_argument(
+        "--sa-size-size",
+        help="Optimzier pool size for xgb plan",
+        default=128,
+        type=int,
+    )
+    parser.add_argument(
+        "--sa-temp-min",
+        help="Minimal temperature for xgb plan optimizer",
+        default=0,
+        type=float,
+    )
+    parser.add_argument(
+        "--sa-temp-max",
+        help="Maximum temperature for xgb plan optimizer",
+        default=1,
+        type=float,
     )
     if is_flop_limit_supported():
         parser.add_argument(
@@ -177,13 +202,23 @@ def tune_kernels(
     tuner: TunerKind = TunerKind.GRID_SEARCH,
     early_stopping: Union[int, None] = None,
     n_trial: Union[int, None] = None,
+    sa_n_iter: int = 500,
+    sa_pool_size: int = 128,
+    sa_temp_min: float = 0,
+    sa_temp_max: float = 1,
     transfer_learning: bool = False,
 ) -> None:
     """Tune TVM kernels."""
     for i, task in enumerate(tasks):
         prefix = f"[Task {i + 1:2d}/{len(tasks):2d}] "
         if tuner == TunerKind.XGB:
-            tuner_obj = XGBTuner(task, loss_type="rank")
+            tuner_obj = XGBTuner(task, loss_type="rank",
+                                 optimizer=SimulatedAnnealingOptimizer(
+                                     task,
+                                     n_iter=sa_n_iter,
+                                     parallel_size=sa_pool_size,
+                                     temp=(sa_temp_max, sa_temp_min),
+                                 ))
         elif tuner == TunerKind.GA:
             tuner_obj = GATuner(task, pop_size=50)
         elif tuner == TunerKind.RANDOM:
@@ -225,6 +260,10 @@ def main(
     tuner_kind: TunerKind,
     task_idx: Union[List[int], None],
     num_iter: Union[int, None],
+    sa_num_iter: int,
+    sa_pool_size: int,
+    sa_temp_min: float,
+    sa_temp_max: float,
     early_stopping: Union[int, None],
     measure_num: int,
     measure_repeats: int,
@@ -245,6 +284,7 @@ def main(
         op_list=[
             "nn.conv2d_transpose",
             "nn.conv2d",
+            "nn.dense",
         ]
     )
     LOG.info("Found %d tasks", len(tasks))
@@ -268,6 +308,10 @@ def main(
         "log_filename": tuner_log,
         "tuner": tuner_kind,
         "n_trial": num_iter,
+        "sa_n_iter": sa_num_iter,
+        "sa_pool_size": sa_pool_size,
+        "sa_temp_min": sa_temp_min,
+        "sa_temp_max": sa_temp_max,
         "early_stopping": early_stopping,
         "measure_option": autotvm.measure_option(
             builder=autotvm.LocalBuilder(timeout=timeout_builder),
@@ -289,6 +333,7 @@ def main(
 if __name__ == "__main__":
     num_threads = multiprocessing.cpu_count()
     os.environ["TVM_NUM_THREADS"] = str(num_threads)
+    os.environ["OMP_NUM_THREADS"] = str(num_threads)
     logging.basicConfig(
         level=logging.WARNING,
         format="[%(levelname)s] %(message)s",
