@@ -29,7 +29,7 @@ atexit.register(lambda: shutil.rmtree(tmpdir))
 block_cipher = None
 data_files = []
 bin_files = []
-common_excludes = ["setuptools", "distutils", "numpy.distutils"]
+common_excludes = ["setuptools", "numpy.distutils"]
 
 get_tvm_sources = import_module_from_path(
     os.path.join(os.getcwd(), "tvm_sources.py"),

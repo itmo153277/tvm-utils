@@ -5,6 +5,7 @@
 
 from typing import Any, Dict, List, Union
 import os
+import gc
 import sys
 import argparse
 import logging
@@ -243,6 +244,7 @@ def tune_kernels(
                 autotvm.callback.log_to_file(str(log_filename)),
             ],
         )
+        gc.collect()
 
 
 def get_task_info(task: autotvm.task.Task) -> str:
