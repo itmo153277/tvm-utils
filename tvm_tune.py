@@ -9,9 +9,9 @@ import gc
 import sys
 import argparse
 import logging
-import multiprocessing
 from enum import Enum
 from pathlib import Path
+import psutil
 import tvm
 from tvm import relay, autotvm
 from tvm.autotvm.tuner import XGBTuner, GATuner, RandomTuner, GridSearchTuner
@@ -61,18 +61,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "-O", "--opt",
-        help="Optimization level (default: %(default)s)",
+        help="Optimization level (default: %(default)d)",
         default=3,
         type=int,
         choices=[0, 1, 2, 3]
-    )
-    parser.add_argument(
-        "-k", "--kind",
-        dest="tuner_kind",
-        help="Tuner type (default: %(default)s)",
-        default=TunerKind.GRID_SEARCH,
-        type=TunerKind,
-        choices=list(TunerKind),
     )
     parser.add_argument(
         "-i", "--tasks",
@@ -81,89 +73,103 @@ def parse_args() -> argparse.Namespace:
         default=None,
         type=argparse_int_list,
     )
-    parser.add_argument(
+    tuner_config = parser.add_argument_group("tuner options")
+    tuner_config.add_argument(
+        "-k", "--kind",
+        dest="tuner_kind",
+        help="Tuner type (default: %(default)s)",
+        default=TunerKind.GRID_SEARCH,
+        type=TunerKind,
+        choices=list(TunerKind),
+    )
+    tuner_config.add_argument(
         "-n", "--num-iter",
         help="Number of iterations",
         default=None,
         type=int,
     )
-    parser.add_argument(
+    tuner_config.add_argument(
         "-s", "--early-stopping",
         help="Early stopping",
         default=None,
         type=int,
     )
-    parser.add_argument(
+    tuner_config.add_argument(
+        "--enable-transfer-learning",
+        help="Enable transfer learning",
+        dest="transfer_learning",
+        default=False,
+        action="store_true",
+    )
+    sa_config = parser.add_argument_group("plan optimizer options")
+    sa_config.add_argument(
         "--sa-num-iter",
-        help="Number of iterations for xgb plan optimizer",
+        help=("Number of iterations for xgb plan optimizer " +
+              "(default: %(default)d)"),
         default=500,
         type=int,
     )
-    parser.add_argument(
+    sa_config.add_argument(
         "--sa-pool-size",
-        help="Optimzier pool size for xgb plan",
+        help="Optimizer pool size for xgb plan (default: %(default)d)",
         default=128,
         type=int,
     )
-    parser.add_argument(
+    sa_config.add_argument(
         "--sa-temp-min",
-        help="Minimal temperature for xgb plan optimizer",
+        help=("Minimal temperature for xgb plan optimizer " +
+              "(default: %(default).1f)"),
         default=0,
         type=float,
     )
-    parser.add_argument(
+    sa_config.add_argument(
         "--sa-temp-max",
-        help="Maximum temperature for xgb plan optimizer",
+        help=("Maximum temperature for xgb plan optimizer " +
+              "(default: %(default).1f)"),
         default=1,
         type=float,
     )
+    measure_config = parser.add_argument_group("measurement options")
     if is_flop_limit_supported():
-        parser.add_argument(
+        measure_config.add_argument(
             "--max-tflops",
             help="TFLOPS limit",
             default=None,
             type=int,
         )
-    parser.add_argument(
+    measure_config.add_argument(
         "--measure-num",
-        help="Number of measurements",
+        help="Number of measurements (default: %(default)d)",
         default=1,
         type=int,
     )
-    parser.add_argument(
+    measure_config.add_argument(
         "--measure-repeats",
-        help="Repeats of measurements",
+        help="Repeats of measurements (default: %(default)d)",
         default=10,
         type=int,
     )
-    parser.add_argument(
+    measure_config.add_argument(
         "--measure-min-time",
-        help="Minimum measurement length in ms",
+        help="Minimum measurement length in ms (default: %(default)d)",
         default=0,
         type=int,
     )
-    parser.add_argument(
+    measure_config.add_argument(
+        "--timeout-builder",
+        help="Timeout for builder in seconds (default: %(default)d)",
+        default=10,
+        type=int,
+    )
+    measure_config.add_argument(
+        "--timeout-runner",
+        help="Timeout for runner in seconds (default: %(default)d)",
+        default=10,
+        type=int,
+    )
+    measure_config.add_argument(
         "--flush-cpu",
         help="Flush CPU cache before measurements",
-        default=False,
-        action="store_true",
-    )
-    parser.add_argument(
-        "--timeout-builder",
-        help="Timeout for builder in seconds",
-        default=10,
-        type=int,
-    )
-    parser.add_argument(
-        "--timeout-runner",
-        help="Timeout for runner in seconds",
-        default=10,
-        type=int,
-    )
-    parser.add_argument(
-        "--enable-transfer-learning",
-        help="Enable transfer learning",
-        dest="transfer_learning",
         default=False,
         action="store_true",
     )
@@ -333,11 +339,11 @@ def main(
 
 
 if __name__ == "__main__":
-    num_threads = multiprocessing.cpu_count()
+    num_threads = psutil.cpu_count(logical=False)
     os.environ["TVM_NUM_THREADS"] = str(num_threads)
     os.environ["OMP_NUM_THREADS"] = str(num_threads)
     logging.basicConfig(
-        level=logging.WARNING,
+        level=logging.DEBUG,
         format="[%(levelname)s] %(message)s",
         stream=sys.stderr,
     )

@@ -28,7 +28,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "-O", "--opt",
-        help="Optimization level (default: %(default)s)",
+        help="Optimization level (default: %(default)d)",
         default=3,
         type=int,
         choices=[0, 1, 2, 3]

@@ -3,3 +3,4 @@ onnx==1.11.0
 protobuf<4
 xgboost==1.2.1
 PyInstaller==5.2
+psutil

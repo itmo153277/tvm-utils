@@ -93,7 +93,7 @@ tvm_compile_analysis = Analysis(
 )
 MERGE(
     (tvm_tune_analysis, "tvm_tune", "tvm_tune"),
-    (tvm_compile_analysis, "tvm_compile", "tvm_tcompile"),
+    (tvm_compile_analysis, "tvm_compile", "tvm_compile"),
 )
 
 tvm_tune_pyz = PYZ(
