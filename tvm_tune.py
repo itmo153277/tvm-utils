@@ -343,7 +343,7 @@ if __name__ == "__main__":
     os.environ["TVM_NUM_THREADS"] = str(num_threads)
     os.environ["OMP_NUM_THREADS"] = str(num_threads)
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.WARNING,
         format="[%(levelname)s] %(message)s",
         stream=sys.stderr,
     )
